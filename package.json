@@ -1,0 +1,10 @@
+{
+  "name": "easy-chat",
+  "workspaces": [
+    "client",
+    "server"
+  ],
+  "scripts": {
+    "dev": "bun run --filter '*' dev"
+  }
+}
