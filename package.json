@@ -3,7 +3,8 @@
   "private": true,
   "workspaces": [
     "client",
-    "server"
+    "server",
+    "types"
   ],
   "scripts": {
     "dev": "pnpm -r run dev"

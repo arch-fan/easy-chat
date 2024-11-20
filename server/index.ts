@@ -1,6 +1,8 @@
 import express from "express";
 import http from "http";
 import WebSocket from "ws";
+import type { AppWS } from "types";
+import { Client } from "./client";
 
 const app = express();
 
@@ -8,28 +10,47 @@ const server = http.createServer(app);
 
 const wss = new WebSocket.Server({ noServer: true });
 
-const clients: WebSocket[] = [];
+const clients: Client[] = [];
 
-wss.on("connection", (ws) => {
-  clients.push(ws); // Agregar cliente cuando se conecta
+wss.on("connection", (ws, msg) => {
+  const user = new URLSearchParams(msg.url?.split("?")[1]).get("user");
+  console.log(user);
+
+  if (!user) {
+    ws.close(1008, "Usuario no proporcionado");
+    return;
+  }
+
+  const client = new Client(ws, user);
+
+  clients.push(client);
 
   ws.on("message", (message) => {
-    const msg = message.toString();
-    console.log("Mensaje recibido: " + msg);
+    const messageString = message.toString();
+    const msg = JSON.parse(messageString) as AppWS.MessageSend;
+    const toSend = JSON.stringify({
+      type: "messageReceive",
+      text: msg.text,
+      username: client.username,
+    } satisfies AppWS.MessageReceive);
+
+    console.log("Mensaje recibido: " + msg.text);
     for (const client of clients) {
-      client.send(msg);
+      client.ws.send(toSend);
     }
   });
 
   ws.on("close", () => {
-    clients.splice(clients.indexOf(ws), 1); // Eliminar cliente cuando se desconecta
+    clients.splice(clients.indexOf(client), 1);
     console.log("Conexión WebSocket cerrada");
   });
 });
 
 // Manejo de la actualización de la conexión a WebSocket en la solicitud HTTP
 server.on("upgrade", (request, socket, head) => {
-  if (request.url === "/ws") {
+  if (request.url?.startsWith("/ws")) {
+    console.log(request.url);
+
     wss.handleUpgrade(request, socket, head, (ws) => {
       wss.emit("connection", ws, request); // Establece la conexión WebSocket
     });

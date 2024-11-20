@@ -1,17 +1,30 @@
 import { type FormEvent, useState, useRef, useEffect } from "react";
+import type { AppWS } from "types";
+import { useLocation } from "wouter";
+import { MdiLogout } from "../icons/logout";
 
-function App() {
-  const [messages, setMessages] = useState<string[]>([]);
+export default function Chat() {
+  const [messages, setMessages] = useState<AppWS.MessageReceive[]>([]);
   const [newMessage, setNewMessage] = useState<string>("");
   const [ws, setWs] = useState<WebSocket>();
   const inputRef = useRef<HTMLInputElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const [, navigate] = useLocation();
+
+  localStorage.getItem("user") || navigate("/");
+
+  const logout = () => {
+    localStorage.removeItem("user");
+    navigate("/");
+  };
 
   useEffect(() => {
-    const ws = new WebSocket(`wss://${location.host}/ws`);
+    const username = localStorage.getItem("user");
+    const ws = new WebSocket(`ws://${location.host}/ws?user=${username}`);
 
     ws.onmessage = (payload) => {
-      setMessages((prev) => [...prev, payload.data]);
+      const message = JSON.parse(payload.data) as AppWS.MessageReceive;
+      setMessages((prev) => [...prev, message]);
     };
 
     setWs(ws);
@@ -22,7 +35,12 @@ function App() {
   const handleSubmit = (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!newMessage) return;
-    ws?.send(newMessage);
+    ws?.send(
+      JSON.stringify({
+        type: "messageSend",
+        text: newMessage,
+      } as AppWS.MessageSend)
+    );
     setNewMessage("");
   };
 
@@ -44,9 +62,10 @@ function App() {
         className="flex flex-col gap-2 p-2 flex-1 border border-zinc-500 rounded overflow-y-scroll overflow-x-hidden"
       >
         {messages.map((m) => (
-          <p className="bg-green-500 text-white w-fit py-1 px-2 rounded-xl break-all">
-            {m}
-          </p>
+          <div className="bg-green-500 flex flex-col gap-0.5 text-white w-fit py-1 px-2 rounded-xl break-all">
+            <span className="text-xs text-zinc-200">{m.username}</span>
+            <p>{m.text}</p>
+          </div>
         ))}
       </div>
       <form onSubmit={handleSubmit}>
@@ -57,8 +76,9 @@ function App() {
           className="px-4 py-2 w-full rounded-full border"
         />
       </form>
+      <button className="absolute bottom-4 left-4 border p-1 rounded">
+        <MdiLogout onClick={logout} className="p-1 size-6" />
+      </button>
     </main>
   );
 }
-
-export default App;
